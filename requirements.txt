@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+SQLModel
+prance
+openapi3-parser
+openai
+asyncpg
+alembic
