@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Endpoint } from './endpoint.entity';
 
 @Entity()
@@ -7,11 +7,21 @@ export class ResponseMessage {
   id: number;
 
   @Column()
-  code: number;
+  endpointId: number;
+
+  @Column()
+  statusCode: number; // HTTP status code (200, 400, 404, etc.)
 
   @Column()
   message: string;
 
-  @ManyToOne(() => Endpoint, (endpoint) => endpoint.id)
+  @Column({ nullable: true })
+  description: string;
+
+  @Column({ nullable: true })
+  suggestion: string; // Suggested action for this response
+
+  @ManyToOne(() => Endpoint, (endpoint) => endpoint.responseMessages)
+  @JoinColumn({ name: 'endpointId' })
   endpoint: Endpoint;
 }

@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Endpoint } from './endpoint.entity';
 
 @Entity()
@@ -7,14 +7,24 @@ export class RequestParameter {
   id: number;
 
   @Column()
+  endpointId: number;
+
+  @Column()
   name: string;
 
   @Column()
-  in: string;
+  in: string; // path, query, header, body
 
   @Column({ nullable: true })
-  required?: boolean;
+  type: string;
 
-  @ManyToOne(() => Endpoint, (endpoint) => endpoint.id)
+  @Column({ default: false })
+  required: boolean;
+
+  @Column({ nullable: true })
+  description: string;
+
+  @ManyToOne(() => Endpoint, (endpoint) => endpoint.requestParameters)
+  @JoinColumn({ name: 'endpointId' })
   endpoint: Endpoint;
 }

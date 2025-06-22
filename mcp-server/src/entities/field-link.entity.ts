@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Endpoint } from './endpoint.entity';
 import { ResponseField } from './response-field.entity';
 
@@ -7,12 +7,26 @@ export class FieldLink {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => ResponseField, (field) => field.id)
-  sourceField: ResponseField;
-
-  @ManyToOne(() => Endpoint, (endpoint) => endpoint.id)
-  targetEndpoint: Endpoint;
+  @Column()
+  fromFieldId: number;
 
   @Column()
-  targetParam: string;
+  toEndpointId: number;
+
+  @Column()
+  toParamName: string;
+
+  @Column({ nullable: true })
+  relationType: string; // e.g., 'direct', 'transformation', etc.
+
+  @Column({ nullable: true })
+  description: string;
+
+  @ManyToOne(() => ResponseField, (field) => field.fieldLinks)
+  @JoinColumn({ name: 'fromFieldId' })
+  fromField: ResponseField;
+
+  @ManyToOne(() => Endpoint, (endpoint) => endpoint.id)
+  @JoinColumn({ name: 'toEndpointId' })
+  toEndpoint: Endpoint;
 }

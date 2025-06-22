@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Endpoint } from './endpoint.entity';
+import { FieldLink } from './field-link.entity';
 
 @Entity()
 export class ResponseField {
@@ -7,8 +8,21 @@ export class ResponseField {
   id: number;
 
   @Column()
-  name: string;
+  endpointId: number;
 
-  @ManyToOne(() => Endpoint, (endpoint) => endpoint.id)
+  @Column()
+  jsonPath: string; // JSONPath to the field in response
+
+  @Column({ nullable: true })
+  type: string;
+
+  @Column({ nullable: true })
+  description: string;
+
+  @ManyToOne(() => Endpoint, (endpoint) => endpoint.responseFields)
+  @JoinColumn({ name: 'endpointId' })
   endpoint: Endpoint;
+
+  @OneToMany(() => FieldLink, (link) => link.fromField)
+  fieldLinks: FieldLink[];
 }
