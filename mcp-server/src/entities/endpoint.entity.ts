@@ -21,6 +21,18 @@ export class Endpoint {
   @Column({ nullable: true })
   summary: string;
 
+  @Column({ type: 'text', nullable: true })
+  promptText: string; // AI generated natural language description
+
+  @Column({ type: 'text', nullable: true })
+  embeddingVector: string; // JSON string of embedding vector for semantic search
+
+  @Column({ type: 'text', nullable: true })
+  keywords: string; // JSON array of keywords for lexical matching
+
+  @Column({ type: 'text', nullable: true })
+  intentPatterns: string; // JSON array of user intent patterns
+
   @ManyToOne(() => Project, (project) => project.endpoints)
   @JoinColumn({ name: 'projectId' })
   project: Project;

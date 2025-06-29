@@ -12,6 +12,15 @@ export class Project {
   @Column({ nullable: true })
   version: string;
 
+  @Column({ nullable: true })
+  baseUrl: string;
+
+  @Column({ nullable: true })
+  domain: string;
+
+  @Column({ nullable: true })
+  description: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

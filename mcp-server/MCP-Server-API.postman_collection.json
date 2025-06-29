@@ -1,0 +1,492 @@
+{
+  "info": {
+    "name": "MCP Server API - Natural Language to API Orchestration",
+    "description": "MCP (Model Context Protocol) Server MVP - Transforms natural language queries into executable API call sequences using GPT-4 and orchestrates multi-step API workflows.",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "projectId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "your_jwt_token_here",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "OpenAPI Management",
+      "description": "Endpoints for managing OpenAPI specifications and project metadata",
+      "item": [
+        {
+          "name": "Upload OpenAPI Specification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "swagger.json",
+                  "description": "OpenAPI JSON/YAML file to upload"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/upload-openapi",
+              "host": ["{{baseUrl}}"],
+              "path": ["upload-openapi"]
+            },
+            "description": "Upload and parse an OpenAPI specification file. The system will extract all endpoints, parameters, responses, and create database records for API orchestration."
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": "swagger.json"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/upload-openapi",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["upload-openapi"]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OpenAPI specification parsed and stored successfully\",\n  \"projectId\": 1,\n  \"projectName\": \"Swagger Petstore\",\n  \"endpointsCount\": 20,\n  \"baseUrl\": \"https://petstore.swagger.io/v2\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Parse Sample OpenAPI (Test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/parse-sample-openapi",
+              "host": ["{{baseUrl}}"],
+              "path": ["parse-sample-openapi"]
+            },
+            "description": "Parse the built-in sample OpenAPI specification (Swagger Petstore) for testing purposes. This is useful for development and testing without uploading a file."
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/parse-sample-openapi",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["parse-sample-openapi"]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Sample OpenAPI parsed and stored successfully\",\n  \"projectId\": 1,\n  \"projectName\": \"Swagger Petstore\",\n  \"endpointsCount\": 20,\n  \"baseUrl\": \"https://petstore.swagger.io/v2\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get All Projects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["projects"]
+            },
+            "description": "Retrieve all projects with their metadata including base URLs, endpoint counts, and creation timestamps."
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/projects",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["projects"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n  {\n    \"id\": 1,\n    \"name\": \"Swagger Petstore\",\n    \"version\": \"1.0.6\",\n    \"baseUrl\": \"https://petstore.swagger.io/v2\",\n    \"description\": \"This is a sample server Petstore server.\",\n    \"createdAt\": \"2024-01-15T10:30:00.000Z\",\n    \"endpoints\": [\n      {\n        \"id\": 1,\n        \"path\": \"/pet\",\n        \"method\": \"POST\",\n        \"summary\": \"Add a new pet to the store\"\n      }\n    ]\n  }\n]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Natural Language Chat Interface",
+      "description": "Main chat interface for processing natural language queries and executing API workflows",
+      "item": [
+        {
+          "name": "Process Natural Language Query",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text",
+                "description": "Optional: JWT token for authenticated API calls"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projectId\": {{projectId}},\n  \"message\": \"Get user information for username 'john_doe'\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat"]
+            },
+            "description": "Main endpoint for processing natural language queries. The system will:\n1. Analyze your query using GPT-4\n2. Generate an execution plan with API calls\n3. Execute the plan step by step\n4. Return results with execution details\n\nSupports complex multi-step workflows with parameter chaining between API calls."
+          },
+          "response": [
+            {
+              "name": "Simple Query Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"projectId\": 1,\n  \"message\": \"Find all available pets\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/chat",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["chat"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"I found 5 available pets for you.\",\n  \"data\": [\n    {\n      \"id\": 1,\n      \"name\": \"doggie\",\n      \"status\": \"available\"\n    }\n  ],\n  \"executionDetails\": {\n    \"planSteps\": 1,\n    \"executionTime\": 850,\n    \"stepsExecuted\": 1,\n    \"plan\": {\n      \"steps\": [\n        {\n          \"endpoint\": \"GET /pet/findByStatus\",\n          \"params\": {\n            \"status\": \"available\"\n          }\n        }\n      ]\n    }\n  }\n}"
+            },
+            {
+              "name": "Multi-step Query Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"projectId\": 1,\n  \"message\": \"Get user john_doe and show me his orders\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/chat",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["chat"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"I found user john_doe and retrieved 3 orders.\",\n  \"data\": {\n    \"user\": {\n      \"id\": 123,\n      \"username\": \"john_doe\",\n      \"email\": \"john@example.com\"\n    },\n    \"orders\": [\n      {\n        \"id\": 1,\n        \"petId\": 456,\n        \"status\": \"placed\"\n      }\n    ]\n  },\n  \"executionDetails\": {\n    \"planSteps\": 2,\n    \"executionTime\": 1250,\n    \"stepsExecuted\": 2,\n    \"plan\": {\n      \"steps\": [\n        {\n          \"endpoint\": \"GET /user/{username}\",\n          \"params\": {\n            \"username\": \"john_doe\"\n          }\n        },\n        {\n          \"endpoint\": \"GET /store/order\",\n          \"params\": {\n            \"userId\": \"$.steps[0].response.id\"\n          }\n        }\n      ]\n    }\n  }\n}"
+            },
+            {
+              "name": "Error Response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"projectId\": 999,\n  \"message\": \"Invalid query\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/chat",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["chat"]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Project not found\",\n  \"error\": \"PROJECT_NOT_FOUND\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Test Multiple Queries",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text",
+                "description": "Optional: JWT token for authenticated API calls"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"queries\": [\n    \"Get all users\",\n    \"Find pets with status available\",\n    \"Get inventory status\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/chat/{{projectId}}/test",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", "{{projectId}}", "test"]
+            },
+            "description": "Test multiple natural language queries in a single request. Useful for testing and development purposes."
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"queries\": [\n    \"Get all users\",\n    \"Find pets with status available\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/chat/1/test",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["chat", "1", "test"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"results\": [\n    {\n      \"query\": \"Get all users\",\n      \"success\": true,\n      \"message\": \"Retrieved all users successfully\",\n      \"executionTime\": 750\n    },\n    {\n      \"query\": \"Find pets with status available\",\n      \"success\": true,\n      \"message\": \"Found 3 available pets\",\n      \"executionTime\": 650\n    }\n  ],\n  \"totalExecutionTime\": 1400,\n  \"successCount\": 2,\n  \"errorCount\": 0\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Example Queries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/chat/examples/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", "examples", "{{projectId}}"]
+            },
+            "description": "Get example natural language queries for a specific project. These examples are dynamically generated based on the available API endpoints."
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/chat/examples/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["chat", "examples", "1"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"projectName\": \"Swagger Petstore\",\n  \"examples\": [\n    {\n      \"category\": \"Pet Management\",\n      \"queries\": [\n        \"Find all available pets\",\n        \"Add a new pet named 'Buddy' with status 'available'\",\n        \"Get pet details for pet ID 123\",\n        \"Update pet status to 'sold' for pet ID 456\"\n      ]\n    },\n    {\n      \"category\": \"User Management\",\n      \"queries\": [\n        \"Get user information for username 'john_doe'\",\n        \"Create a new user with username 'alice' and email 'alice@example.com'\",\n        \"Login user with username 'bob' and password 'password123'\"\n      ]\n    },\n    {\n      \"category\": \"Store Management\",\n      \"queries\": [\n        \"Get store inventory status\",\n        \"Place an order for pet ID 789 with quantity 1\",\n        \"Get order details for order ID 123\",\n        \"Delete order with ID 456\"\n      ]\n    },\n    {\n      \"category\": \"Complex Workflows\",\n      \"queries\": [\n        \"Get user john_doe and show me his orders\",\n        \"Find available pets and create an order for the first one\",\n        \"Create a user named 'test' and then place an order for pet ID 123\"\n      ]\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Set dynamic variables if needed",
+          "if (!pm.environment.get('baseUrl')) {",
+          "    pm.environment.set('baseUrl', 'http://localhost:3000');",
+          "}",
+          "",
+          "if (!pm.environment.get('projectId')) {",
+          "    pm.environment.set('projectId', '1');",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Basic response validation",
+          "pm.test('Status code is success', function () {",
+          "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202]);",
+          "});",
+          "",
+          "pm.test('Response time is less than 10s', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(10000);",
+          "});",
+          "",
+          "pm.test('Response has JSON body', function () {",
+          "    pm.response.to.have.jsonBody();",
+          "});"
+        ]
+      }
+    }
+  ]
+} 
