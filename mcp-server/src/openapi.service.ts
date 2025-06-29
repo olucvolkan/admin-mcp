@@ -1,5 +1,6 @@
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Endpoint } from './entities/endpoint.entity';
@@ -8,10 +9,13 @@ import { Project } from './entities/project.entity';
 import { RequestParameter } from './entities/request-parameter.entity';
 import { ResponseField } from './entities/response-field.entity';
 import { ResponseMessage } from './entities/response-message.entity';
+import OpenAI from 'openai';
+import { findBestMatch } from 'string-similarity';
 
 @Injectable()
 export class OpenapiService {
   private readonly logger = new Logger(OpenapiService.name);
+  private openai: OpenAI | null;
 
   constructor(
     @InjectRepository(Project)
@@ -26,7 +30,11 @@ export class OpenapiService {
     private responseMessageRepo: Repository<ResponseMessage>,
     @InjectRepository(FieldLink)
     private fieldLinkRepo: Repository<FieldLink>,
-  ) {}
+    private configService: ConfigService,
+  ) {
+    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
+    this.openai = apiKey ? new OpenAI({ apiKey }) : null;
+  }
 
   async parseAndStore(filePath: string): Promise<{ projectId: number; endpointsCount: number }> {
     try {
@@ -82,12 +90,14 @@ export class OpenapiService {
   }
 
   private async createEndpoint(projectId: number, path: string, method: string, operation: any): Promise<void> {
+    const prompt = await this.generateEndpointPrompt(path, method, operation);
     // Create endpoint
     const endpoint = await this.endpointRepo.save({
       projectId,
       path,
       method: method.toUpperCase(),
       summary: operation.summary || operation.description || `${method.toUpperCase()} ${path}`,
+      prompt,
     });
 
     this.logger.debug(`Created endpoint: ${method.toUpperCase()} ${path} (ID: ${endpoint.id})`);
@@ -288,6 +298,44 @@ export class OpenapiService {
     }
     
     return 'unknown';
+  }
+
+  private async generateEndpointPrompt(path: string, method: string, operation: any): Promise<string> {
+    const summary = operation.summary || operation.description || `${method.toUpperCase()} ${path}`;
+    const params = (operation.parameters || [])
+      .map((p: any) => `${p.name} in ${p.in}`)
+      .join(', ');
+    const base = `${method.toUpperCase()} ${path} - ${summary}` + (params ? ` (params: ${params})` : '');
+
+    if (!this.openai) {
+      return base;
+    }
+
+    try {
+      const messages = [
+        { role: 'system', content: 'You generate concise natural language descriptions of API endpoints.' },
+        { role: 'user', content: `Describe the purpose of this endpoint in one sentence: ${base}` },
+      ];
+      const completion = await this.openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages,
+        temperature: 0.2,
+        max_tokens: 60,
+      });
+      return completion.choices[0].message.content.trim();
+    } catch (err: any) {
+      this.logger.error(`OpenAI prompt generation failed for ${method.toUpperCase()} ${path}: ${err.message}`);
+      return base;
+    }
+  }
+
+  async findBestEndpoint(message: string): Promise<Endpoint | null> {
+    const endpoints = await this.endpointRepo.find();
+    if (endpoints.length === 0) return null;
+
+    const prompts = endpoints.map((e) => e.prompt || e.summary || `${e.method} ${e.path}`);
+    const { bestMatchIndex } = findBestMatch(message, prompts);
+    return endpoints[bestMatchIndex] || null;
   }
 
   private generateSuggestion(statusCode: number, description: string): string {

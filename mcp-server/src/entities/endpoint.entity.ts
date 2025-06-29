@@ -1,4 +1,11 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { Project } from './project.entity';
 import { RequestParameter } from './request-parameter.entity';
 import { ResponseField } from './response-field.entity';
@@ -20,6 +27,9 @@ export class Endpoint {
 
   @Column({ nullable: true })
   summary: string;
+
+  @Column({ nullable: true })
+  prompt: string;
 
   @ManyToOne(() => Project, (project) => project.endpoints)
   @JoinColumn({ name: 'projectId' })
