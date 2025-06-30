@@ -247,18 +247,50 @@ export class ExecutorService {
       }))
     };
 
-    const results = JSONPath.query(dataContext, jsonPath);
+    try {
+      // Use JSONPath.query method correctly
+      const results = JSONPath.query(dataContext, jsonPath);
+      
+      if (results.length === 0) {
+        throw new Error(`JSONPath ${jsonPath} returned no results`);
+      }
+
+      if (results.length === 1) {
+        return results[0];
+      }
+
+      // Multiple results - return array
+      return results;
+    } catch (error) {
+      // Fallback: try manual resolution for common patterns
+      const manualResult = this.resolveJSONPathManually(jsonPath, dataContext);
+      if (manualResult !== undefined) {
+        return manualResult;
+      }
+      throw new Error(`JSONPath resolution failed: ${error.message}`);
+    }
+  }
+
+  private resolveJSONPathManually(jsonPath: string, dataContext: any): any {
+    // Handle common patterns manually
+    const pathMatch = jsonPath.match(/^\$\.steps\[(\d+)\]\.response\.(.+)$/);
+    if (pathMatch) {
+      const stepIndex = parseInt(pathMatch[1]);
+      const responsePath = pathMatch[2];
+      
+      if (dataContext.steps && dataContext.steps[stepIndex]) {
+        const response = dataContext.steps[stepIndex].response;
+        return this.getNestedProperty(response, responsePath);
+      }
+    }
     
-    if (results.length === 0) {
-      throw new Error(`JSONPath ${jsonPath} returned no results`);
-    }
+    return undefined;
+  }
 
-    if (results.length === 1) {
-      return results[0];
-    }
-
-    // Multiple results - return array
-    return results;
+  private getNestedProperty(obj: any, path: string): any {
+    return path.split('.').reduce((current, prop) => {
+      return current && current[prop] !== undefined ? current[prop] : undefined;
+    }, obj);
   }
 
   private async executeStep(
@@ -309,7 +341,27 @@ export class ExecutorService {
       const paramDef = endpoint.requestParameters?.find(p => p.name === paramName);
       
       if (!paramDef) {
-        this.logger.warn(`Unknown parameter ${paramName} for ${step.endpoint}`);
+        // Handle special authentication parameters
+        if (paramName === 'Authorization' || paramName === 'authorization') {
+          // Add Bearer token format if it's a token
+          const tokenValue = String(paramValue);
+          if (tokenValue && !tokenValue.startsWith('Bearer ')) {
+            headers['Authorization'] = `Bearer ${tokenValue}`;
+          } else {
+            headers['Authorization'] = tokenValue;
+          }
+          this.logger.debug(`Added Authorization header: ${headers['Authorization']}`);
+          continue;
+        }
+        
+        // For other unknown parameters, try to guess the location
+        if (method.toUpperCase() === 'GET') {
+          queryParams[paramName] = paramValue;
+          this.logger.debug(`Added unknown parameter ${paramName} to query params for GET request`);
+        } else {
+          bodyParams[paramName] = paramValue;
+          this.logger.debug(`Added unknown parameter ${paramName} to body params for ${method} request`);
+        }
         continue;
       }
 

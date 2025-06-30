@@ -158,45 +158,74 @@ export class PlannerService {
   }
 
   private async buildPrompt(userQuery: string, metadata: ApiMetadata, relevantContext: any[] = []): Promise<string> {
-    const endpointsList = metadata.endpoints
-      .slice(0, 15) // Limit to prevent token overflow
-      .map(ep => 
-        `${ep.method} ${ep.path} - ${ep.summary}` +
-        (ep.parameters.length > 0 
-          ? `. Params: ${ep.parameters.map(p => `${p.name}(${p.in}${p.required ? ', required' : ''})`).join(', ')}`
-          : ''
-        )
+    // Get best matching endpoints based on user intent
+    const relevantEndpoints = await this.resolveIntent(userQuery, metadata.endpoints);
+
+    this.logger.log(`Found ${relevantEndpoints.length} matching endpoints above threshold`);
+
+    // Check if any endpoints require authentication
+    const authEndpoints = metadata.endpoints.filter(ep => 
+      ep.path.includes('/auth/login') || 
+      ep.path.includes('/login') ||
+      ep.summary?.toLowerCase().includes('login') ||
+      ep.summary?.toLowerCase().includes('authenticate')
+    );
+
+    const hasAuthEndpoints = authEndpoints.length > 0;
+    const requiresAuth = relevantEndpoints.some(ep => 
+      ep.parameters.some(p => 
+        p.name.toLowerCase().includes('authorization') || 
+        p.name.toLowerCase().includes('token') ||
+        p.name.toLowerCase().includes('auth')
       )
-      .join('\n');
+    );
 
-    const fieldLinksList = metadata.fieldLinks
-      .slice(0, 10) // Limit field links
-      .map(link => `${link.fromField} from "${link.fromEndpoint}" → ${link.toParam} in "${link.toEndpoint}"`)
-      .join('\n');
+    // Build endpoint descriptions
+    const endpointDescriptions = relevantEndpoints.map(endpoint => {
+      const params = endpoint.parameters.map(p => {
+        const requiredText = p.required ? ' (required)' : ' (optional)';
+        return `  - ${p.name} (${p.in}): ${p.type}${requiredText} - ${p.description}`;
+      }).join('\n');
 
-    // Build context section from relevant cached data
-    const contextSection = relevantContext.length > 0 
-      ? `\nRelevant Context from Previous Queries:
-${relevantContext.map((ctx, index) => 
-  `${index + 1}. Query: "${ctx.query}"
-   Result: ${JSON.stringify(ctx.data).slice(0, 200)}${JSON.stringify(ctx.data).length > 200 ? '...' : ''}
-   Endpoint: ${ctx.endpoint}`
-).join('\n\n')}
+      return `${endpoint.method} ${endpoint.path}
+Summary: ${endpoint.summary}
+${endpoint.promptText ? `AI Description: ${endpoint.promptText}` : ''}
+Parameters:
+${params || '  None'}`;
+    }).join('\n\n');
 
-Use this context to understand what data might already be available or what the user might be referring to.
-` : '';
+    // Add authentication information if needed
+    let authInstructions = '';
+    if (hasAuthEndpoints && requiresAuth) {
+      const loginEndpoint = authEndpoints[0];
+      authInstructions = `
 
-    return `You are an intelligent API planner that translates user requests into structured API call sequences.
+AUTHENTICATION REQUIRED:
+This API requires authentication. Available login endpoint:
+${loginEndpoint.method} ${loginEndpoint.path} - ${loginEndpoint.summary}
 
-User Query: "${userQuery}"
-${contextSection}
-Available API Endpoints:
-${endpointsList}
+Authentication Instructions:
+1. If the request requires authentication, ALWAYS start with the login endpoint first
+2. Use the login response token in subsequent requests
+3. For login responses with nested data, use JSONPath like: "$.steps[0].response.data.token"
+4. For simple token responses, use: "$.steps[0].response.token"
+5. Pass the token in Authorization parameter for authenticated endpoints
+6. Example two-step plan:
+   Step 1: POST /auth/login with credentials
+   Step 2: GET /protected-resource with "Authorization": "$.steps[0].response.data.token"
+`;
+    }
 
-${fieldLinksList ? `Field Relationships (for chaining calls):
-${fieldLinksList}
+    return `Plan API calls to fulfill this user request: "${userQuery}"
 
-` : ''}Instructions:
+Available endpoints:
+${endpointDescriptions}
+${authInstructions}
+
+Context from previous conversations:
+${relevantContext.length > 0 ? JSON.stringify(relevantContext, null, 2) : 'None'}
+
+Instructions:
 1. Analyze the user's request and identify the most appropriate endpoint(s)
 2. For queries like "get all users", "list users", "show users" - use GET endpoints that retrieve user data
 3. For queries like "get all products", "list products" - use GET endpoints that retrieve product data
@@ -219,10 +248,12 @@ ${fieldLinksList}
 9. Ensure all required parameters are included
 10. DO NOT include any explanatory text, only the JSON plan
 11. ALWAYS provide a valid JSON response with at least one step
+12. If authentication is required, include login step first with proper credentials
 
 Examples:
 - "Get all users" → {"steps": [{"endpoint": "GET /users", "params": {}}]}
 - "Find user john" → {"steps": [{"endpoint": "GET /users/{username}", "params": {"username": "john"}}]}
+- "Login and get users" → {"steps": [{"endpoint": "POST /auth/login", "params": {"email": "admin@example.com", "password": "password"}}, {"endpoint": "GET /users", "params": {"Authorization": "$.steps[0].response.data.token"}}]}
 
 Plan:`;
   }

@@ -447,15 +447,43 @@ export class OpenapiController {
         method: endpoint.method.toLowerCase(),
         url: url,
         timeout: 10000,
-        validateStatus: () => true // Don't throw on 4xx/5xx
+        validateStatus: () => true, // Don't throw on 4xx/5xx
+        headers: {} as any
       };
+
+      // Add authentication headers if provided
+      if (body.parameters) {
+        // Check for authorization parameters
+        if (body.parameters['Authorization'] || body.parameters['authorization']) {
+          const authValue = body.parameters['Authorization'] || body.parameters['authorization'];
+          config.headers['Authorization'] = authValue.startsWith('Bearer ') ? authValue : `Bearer ${authValue}`;
+        }
+        
+        // Check for other common auth headers
+        if (body.parameters['X-Auth-Token']) {
+          config.headers['X-Auth-Token'] = body.parameters['X-Auth-Token'];
+        }
+        
+        if (body.parameters['X-API-Key']) {
+          config.headers['X-API-Key'] = body.parameters['X-API-Key'];
+        }
+      }
 
       // Add request body for POST/PUT/PATCH
       if (['POST', 'PUT', 'PATCH'].includes(endpoint.method.toUpperCase()) && body.parameters) {
         const bodyParams = endpoint.requestParameters?.filter(p => p.in === 'body') || [];
         if (bodyParams.length > 0 || Object.keys(body.parameters).length > 0) {
-          config['data'] = body.parameters;
-          config['headers'] = { 'Content-Type': 'application/json' };
+          // Filter out authorization parameters from body
+          const filteredParams = { ...body.parameters };
+          delete filteredParams['Authorization'];
+          delete filteredParams['authorization'];
+          delete filteredParams['X-Auth-Token'];
+          delete filteredParams['X-API-Key'];
+          
+          if (Object.keys(filteredParams).length > 0) {
+            config['data'] = filteredParams;
+            config.headers['Content-Type'] = 'application/json';
+          }
         }
       }
 
