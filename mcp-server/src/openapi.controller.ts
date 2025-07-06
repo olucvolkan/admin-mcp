@@ -371,6 +371,7 @@ export class OpenapiController {
     error?: string;
     url?: string;
     timing?: number;
+    requiresAuth?: boolean;
   }> {
     const project = await this.projectRepo.findOne({ 
       where: { id: projectId },
@@ -451,7 +452,8 @@ export class OpenapiController {
         headers: {} as any
       };
 
-      // Add authentication headers if provided
+      // Enhanced authentication handling
+      const requiresAuth = this.requiresAuthentication(endpoint);
       if (body.parameters) {
         // Check for authorization parameters
         if (body.parameters['Authorization'] || body.parameters['authorization']) {
@@ -467,6 +469,23 @@ export class OpenapiController {
         if (body.parameters['X-API-Key']) {
           config.headers['X-API-Key'] = body.parameters['X-API-Key'];
         }
+      }
+
+      // Check if endpoint requires auth but no auth provided
+      const hasAuthProvided = config.headers['Authorization'] || config.headers['X-Auth-Token'] || config.headers['X-API-Key'];
+      if (requiresAuth && !hasAuthProvided) {
+        return {
+          status: 'error',
+          endpoint: {
+            id: endpoint.id,
+            method: endpoint.method,
+            path: endpoint.path,
+            summary: endpoint.summary
+          },
+          error: 'This endpoint requires authentication. Please provide Authorization, X-Auth-Token, or X-API-Key parameter.',
+          url: url,
+          requiresAuth: true
+        };
       }
 
       // Add request body for POST/PUT/PATCH
@@ -524,5 +543,47 @@ export class OpenapiController {
         url: url
       };
     }
+  }
+
+  /**
+   * Check if an endpoint requires authentication
+   */
+  private requiresAuthentication(endpoint: any): boolean {
+    const path = endpoint.path;
+    
+    // Skip login endpoints
+    if (path.includes('/login') || path.includes('/auth/login') || path.includes('/signin')) {
+      return false;
+    }
+
+    // Check if endpoint has auth-related parameters
+    const hasAuthParams = endpoint.requestParameters?.some(param => 
+      param.name.toLowerCase().includes('authorization') ||
+      param.name.toLowerCase().includes('token') ||
+      param.name.toLowerCase().includes('auth') ||
+      param.in === 'header' && (
+        param.name === 'Authorization' ||
+        param.name === 'X-Auth-Token' ||
+        param.name === 'X-API-Key'
+      )
+    );
+
+    if (hasAuthParams) {
+      return true;
+    }
+
+    // Common patterns that typically require auth
+    const authRequiredPatterns = [
+      '/admin',
+      '/user',
+      '/profile',
+      '/account',
+      '/dashboard',
+      '/api/v',
+      '/protected',
+      '/secure',
+    ];
+
+    return authRequiredPatterns.some(pattern => path.includes(pattern));
   }
 }

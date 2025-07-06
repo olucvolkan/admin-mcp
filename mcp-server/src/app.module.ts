@@ -21,6 +21,8 @@ import { FormatterService } from './formatter/formatter.service';
 import { OpenapiController } from './openapi.controller';
 import { OpenapiService } from './openapi.service';
 import { PlannerService } from './planner/planner.service';
+import { VisualResponseModule } from './visual-response/visual-response.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -49,6 +51,7 @@ import { PlannerService } from './planner/planner.service';
       timeout: 30000,
       maxRedirects: 5,
     }),
+    VisualResponseModule,
   ],
   controllers: [AppController, OpenapiController, ChatController],
   providers: [

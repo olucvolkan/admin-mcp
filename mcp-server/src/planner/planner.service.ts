@@ -194,25 +194,47 @@ Parameters:
 ${params || '  None'}`;
     }).join('\n\n');
 
-    // Add authentication information if needed
+    // Enhanced authentication detection and instructions
     let authInstructions = '';
-    if (hasAuthEndpoints && requiresAuth) {
+    const authRequiredEndpoints = relevantEndpoints.filter(ep => this.requiresAuthentication(ep));
+    
+    if (hasAuthEndpoints && (requiresAuth || authRequiredEndpoints.length > 0)) {
       const loginEndpoint = authEndpoints[0];
       authInstructions = `
 
-AUTHENTICATION REQUIRED:
-This API requires authentication. Available login endpoint:
+🔐 AUTHENTICATION REQUIRED:
+Some endpoints require authentication. Available login endpoint:
 ${loginEndpoint.method} ${loginEndpoint.path} - ${loginEndpoint.summary}
 
-Authentication Instructions:
-1. If the request requires authentication, ALWAYS start with the login endpoint first
-2. Use the login response token in subsequent requests
-3. For login responses with nested data, use JSONPath like: "$.steps[0].response.data.token"
-4. For simple token responses, use: "$.steps[0].response.token"
-5. Pass the token in Authorization parameter for authenticated endpoints
-6. Example two-step plan:
-   Step 1: POST /auth/login with credentials
-   Step 2: GET /protected-resource with "Authorization": "$.steps[0].response.data.token"
+Authentication Chain Strategy:
+1. ALWAYS start with login if ANY endpoint in the plan requires authentication
+2. Extract token from login response using common patterns:
+   - "$.steps[0].response.token" (direct token)
+   - "$.steps[0].response.data.token" (nested in data)
+   - "$.steps[0].response.access_token" (access_token field)
+   - "$.steps[0].response.data.access_token" (nested access_token)
+   
+3. Add Authentication to protected endpoints using: "Authorization": "<token_reference>"
+4. Endpoints requiring authentication: ${authRequiredEndpoints.map(ep => `${ep.method} ${ep.path}`).join(', ')}
+
+Example Authentication Flow:
+{
+  "steps": [
+    {
+      "endpoint": "POST /auth/login",
+      "params": {
+        "email": "admin@example.com",
+        "password": "password"
+      }
+    },
+    {
+      "endpoint": "GET /protected-resource",
+      "params": {
+        "Authorization": "$.steps[0].response.data.token"
+      }
+    }
+  ]
+}
 `;
     }
 
@@ -558,5 +580,47 @@ Plan:`;
       this.metadataCache.clear();
       this.logger.debug('Cleared all metadata cache');
     }
+  }
+
+  /**
+   * Check if an endpoint requires authentication
+   */
+  private requiresAuthentication(endpoint: any): boolean {
+    const path = endpoint.path;
+    
+    // Skip login endpoints
+    if (path.includes('/login') || path.includes('/auth/login') || path.includes('/signin')) {
+      return false;
+    }
+
+    // Check if endpoint has auth-related parameters
+    const hasAuthParams = endpoint.parameters?.some(param => 
+      param.name.toLowerCase().includes('authorization') ||
+      param.name.toLowerCase().includes('token') ||
+      param.name.toLowerCase().includes('auth') ||
+      param.in === 'header' && (
+        param.name === 'Authorization' ||
+        param.name === 'X-Auth-Token' ||
+        param.name === 'X-API-Key'
+      )
+    );
+
+    if (hasAuthParams) {
+      return true;
+    }
+
+    // Common patterns that typically require auth
+    const authRequiredPatterns = [
+      '/admin',
+      '/user',
+      '/profile',
+      '/account',
+      '/dashboard',
+      '/api/v',
+      '/protected',
+      '/secure',
+    ];
+
+    return authRequiredPatterns.some(pattern => path.includes(pattern));
   }
 } 

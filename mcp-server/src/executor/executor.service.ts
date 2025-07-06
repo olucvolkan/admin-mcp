@@ -94,7 +94,8 @@ export class ExecutorService {
             interpolatedParams,
             baseUrl,
             userContext,
-            projectId
+            projectId,
+            stepResults
           );
 
           const stepResult: StepResult = {
@@ -298,7 +299,8 @@ export class ExecutorService {
     params: Record<string, any>,
     baseUrl: string,
     userContext?: UserContext,
-    projectId?: number
+    projectId?: number,
+    previousResults?: StepResult[]
   ): Promise<AxiosResponse> {
     // Parse endpoint
     const [method, path] = step.endpoint.split(' ', 2);
@@ -328,9 +330,20 @@ export class ExecutorService {
     };
 
     // Add authentication
-    if (userContext) {
+    if (userContext && userContext.authType !== 'none') {
       const authHeaders = this.authService.createAuthHeaders(userContext);
       Object.assign(headers, authHeaders);
+      this.logger.debug(`Added auth headers from ${userContext.authType}: ${JSON.stringify(Object.keys(authHeaders))}`);
+    }
+
+    // Auto-detect authentication requirement and add token from previous steps
+    const requiresAuth = this.requiresAuthentication(endpoint, path);
+    if (requiresAuth && previousResults) {
+      const authToken = this.extractAuthTokenFromPreviousResults(previousResults);
+      if (authToken) {
+        headers['Authorization'] = authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}`;
+        this.logger.log(`🔐 Auto-added authentication token for ${step.endpoint}`);
+      }
     }
 
     // Categorize parameters
@@ -351,6 +364,13 @@ export class ExecutorService {
             headers['Authorization'] = tokenValue;
           }
           this.logger.debug(`Added Authorization header: ${headers['Authorization']}`);
+          continue;
+        }
+        
+        // Handle other auth headers
+        if (paramName === 'X-Auth-Token' || paramName === 'X-API-Key' || paramName === 'X-Access-Token') {
+          headers[paramName] = String(paramValue);
+          this.logger.debug(`Added auth header ${paramName}`);
           continue;
         }
         
@@ -566,6 +586,93 @@ export class ExecutorService {
     } catch (error) {
       return `[Error serializing response: ${error.message}]`;
     }
+  }
+
+  /**
+   * Check if an endpoint requires authentication
+   */
+  private requiresAuthentication(endpoint: any, path: string): boolean {
+    // Skip login endpoints
+    if (path.includes('/login') || path.includes('/auth/login') || path.includes('/signin')) {
+      return false;
+    }
+
+    // Check if endpoint has auth-related parameters
+    const hasAuthParams = endpoint.requestParameters?.some(param => 
+      param.name.toLowerCase().includes('authorization') ||
+      param.name.toLowerCase().includes('token') ||
+      param.name.toLowerCase().includes('auth') ||
+      param.in === 'header' && (
+        param.name === 'Authorization' ||
+        param.name === 'X-Auth-Token' ||
+        param.name === 'X-API-Key'
+      )
+    );
+
+    if (hasAuthParams) {
+      return true;
+    }
+
+    // Common patterns that typically require auth
+    const authRequiredPatterns = [
+      '/admin',
+      '/user',
+      '/profile',
+      '/account',
+      '/dashboard',
+      '/api/v',
+      '/protected',
+      '/secure',
+    ];
+
+    return authRequiredPatterns.some(pattern => path.includes(pattern));
+  }
+
+  /**
+   * Extract authentication token from previous step results
+   */
+  private extractAuthTokenFromPreviousResults(previousResults: StepResult[]): string | null {
+    for (const result of previousResults) {
+      if (!result.success || !result.response) {
+        continue;
+      }
+
+      // Try different common token paths
+      const tokenPaths = [
+        'token',
+        'access_token',
+        'accessToken',
+        'authToken',
+        'auth_token',
+        'bearer_token',
+        'bearerToken',
+        'data.token',
+        'data.access_token',
+        'data.accessToken',
+        'result.token',
+        'result.access_token',
+        'user.token',
+        'user.access_token',
+        'session.token',
+        'session.access_token'
+      ];
+
+      for (const path of tokenPaths) {
+        const token = this.getNestedProperty(result.response, path);
+        if (token && typeof token === 'string' && token.length > 10) {
+          this.logger.debug(`Found auth token at path: ${path}`);
+          return token;
+        }
+      }
+
+      // Also check if the response itself is a simple token string
+      if (typeof result.response === 'string' && result.response.length > 20) {
+        return result.response;
+      }
+    }
+
+    this.logger.debug('No authentication token found in previous results');
+    return null;
   }
 
   private async checkIfResponseSatisfiesRequest(

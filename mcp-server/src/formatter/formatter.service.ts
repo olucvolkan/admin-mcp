@@ -1,9 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
+import { TransformationResult, VisualResponse } from '../visual-response/visual-response.interfaces';
+import { VisualResponseService } from '../visual-response/visual-response.service';
 
 export interface FormattedResponse {
   summary: string;
   formattedData: string;
+  visualResponse?: VisualResponse;
+  transformationResult?: TransformationResult;
   metadata: {
     dataType: string;
     itemCount?: number;
@@ -17,16 +21,21 @@ export class FormatterService {
   private readonly logger = new Logger(FormatterService.name);
   private openai: OpenAI;
 
-  constructor() {
+  constructor(private visualResponseService: VisualResponseService) {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
   }
 
   /**
-   * Format API response data into user-friendly format using LLM
+   * Format API response data into user-friendly format using VisualResponse system and LLM
    */
-  async formatApiResponse(data: any, originalQuery: string): Promise<FormattedResponse> {
+  async formatApiResponse(
+    data: any, 
+    originalQuery: string, 
+    endpoint?: string, 
+    method: string = 'GET'
+  ): Promise<FormattedResponse> {
     if (!data) {
       return {
         summary: "No data returned from the API",
@@ -36,16 +45,30 @@ export class FormatterService {
     }
 
     try {
-      // Use LLM to format the response
-      const formatted = await this.formatWithLLM(data, originalQuery);
-      return formatted;
+      // First, try to transform using VisualResponse system
+      let transformationResult: TransformationResult | undefined;
+      let visualResponse: VisualResponse | undefined;
+      
+      if (endpoint) {
+        transformationResult = await this.visualResponseService.transform(data, endpoint, method);
+        visualResponse = transformationResult?.visualResponse;
+      }
+
+      // Use LLM to format the response (for backward compatibility and enhanced formatting)
+      const formatted = await this.formatWithLLM(data, originalQuery, visualResponse);
+      
+      return {
+        ...formatted,
+        visualResponse,
+        transformationResult: transformationResult || undefined
+      };
     } catch (error) {
-      this.logger.error('LLM formatting failed, using fallback', error);
+      this.logger.error('Formatting failed, using fallback', error);
       return this.formatFallback(data, originalQuery);
     }
   }
 
-  private async formatWithLLM(data: any, originalQuery: string): Promise<FormattedResponse> {
+  private async formatWithLLM(data: any, originalQuery: string, visualResponse?: VisualResponse): Promise<FormattedResponse> {
     const prompt = `You are a helpful assistant that formats API response data into user-friendly format.
 
 User's original query: "${originalQuery}"

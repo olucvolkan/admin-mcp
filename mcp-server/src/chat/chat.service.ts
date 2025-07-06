@@ -24,6 +24,8 @@ export interface ChatResponse {
   message: string;
   data?: any;
   formattedResponse?: string;
+  visualResponse?: any; // VisualResponse from visual-response system
+  transformationResult?: any; // Transformation metadata
   cacheKey?: string; // Add cache key to response
   relevantContext?: Array<{
     query: string;
@@ -284,6 +286,8 @@ export class ChatService {
           data: {
             summary: formattedResponse.message,
             formattedData: formattedResponse.formattedResponse,
+            visualResponse: formattedResponse.visualResponse,
+            transformationResult: formattedResponse.transformationResult,
             rawData: formattedResponse.data // Raw data for debugging if needed
           },
           timestamp: new Date().toISOString(),
@@ -863,8 +867,25 @@ Only suggest retry if you can identify a clear correction to the user's query th
     executionResult: any
   ): Promise<ChatResponse> {
     try {
+      // Extract endpoint information from the last executed step for VisualResponse
+      let endpoint: string | undefined;
+      let method: string = 'GET';
+      
+      if (executionResult.steps && executionResult.steps.length > 0) {
+        const lastStep = executionResult.steps[executionResult.steps.length - 1];
+        if (lastStep.endpoint) {
+          endpoint = lastStep.endpoint;
+          method = lastStep.method || 'GET';
+        }
+      }
+
       // Use FormatterService to format the response in a user-friendly way
-      const formattedResponse = await this.formatterService.formatApiResponse(finalResult, originalQuery);
+      const formattedResponse = await this.formatterService.formatApiResponse(
+        finalResult, 
+        originalQuery, 
+        endpoint, 
+        method
+      );
 
       // Prepare execution details with early termination info
       const executionDetails = {
@@ -888,6 +909,8 @@ Only suggest retry if you can identify a clear correction to the user's query th
         message,
         data: finalResult,
         formattedResponse: formattedResponse.formattedData,
+        visualResponse: formattedResponse.visualResponse,
+        transformationResult: formattedResponse.transformationResult,
         executionDetails
       };
 

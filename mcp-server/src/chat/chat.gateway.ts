@@ -1,12 +1,12 @@
 import { Logger } from '@nestjs/common';
 import {
-  ConnectedSocket,
-  MessageBody,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  SubscribeMessage,
-  WebSocketGateway,
-  WebSocketServer,
+    ConnectedSocket,
+    MessageBody,
+    OnGatewayConnection,
+    OnGatewayDisconnect,
+    SubscribeMessage,
+    WebSocketGateway,
+    WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { AuthService, UserContext } from '../auth/auth.service';
@@ -43,16 +43,21 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (sessionCookie) {
         client.userContext = {
           sessionCookie,
-          cookieName: sessionCookieName
+          cookieName: sessionCookieName,
+          authType: 'session'
         };
         this.logger.log(`WebSocket client connected with session: ${sessionCookieName}`);
       } else {
+        client.userContext = {
+          authType: 'none'
+        };
         this.logger.log('WebSocket client connected without session cookie');
       }
 
       client.emit('connectionInfo', {
         connected: true,
-        hasSession: !!client.userContext,
+        hasSession: client.userContext?.authType !== 'none',
+        authType: client.userContext?.authType || 'none',
         sessionCookieName: client.userContext?.cookieName || 'none',
         timestamp: new Date().toISOString()
       });
@@ -69,10 +74,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   handleDisconnect(client: AuthenticatedSocket) {
-    if (client.userContext) {
+    if (client.userContext?.authType === 'session') {
       this.logger.log(`WebSocket client disconnected (had session: ${client.userContext.cookieName})`);
     } else {
-      this.logger.log('WebSocket client disconnected (no session)');
+      this.logger.log('WebSocket client disconnected (no authentication)');
     }
   }
 
@@ -86,10 +91,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       this.logger.log(`WebSocket chat query for project ${data.projectId}: "${data.message}"`);
       
-      if (client.userContext) {
+      if (client.userContext?.authType === 'session') {
         this.logger.debug(`Query with session: ${client.userContext.cookieName}`);
       } else {
-        this.logger.debug('Query without session - API will handle authentication');
+        this.logger.debug('Query without authentication - API will handle authentication');
       }
 
       const chatRequest: ChatRequest = {
@@ -125,7 +130,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.log(`WebSocket get chat history for project ${data.projectId}`);
 
       // Extract userId from session if available (optional)
-      const userId = client.userContext?.sessionCookie ? 
+      const userId = client.userContext?.authType === 'session' && client.userContext.sessionCookie ? 
         client.userContext.sessionCookie.substring(0, 8) : undefined;
 
       const history = await this.chatService.getChatHistory(
@@ -137,7 +142,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.emit('chat_history', {
         projectId: data.projectId,
         history,
-        hasSession: !!client.userContext,
+        hasSession: client.userContext?.authType !== 'none',
+        authType: client.userContext?.authType || 'none',
         userId: userId || 'anonymous'
       });
 
@@ -161,7 +167,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.log(`WebSocket clear cache for project ${data.projectId}`);
 
       // Extract userId from session if available (optional)
-      const userId = client.userContext?.sessionCookie ? 
+      const userId = client.userContext?.authType === 'session' && client.userContext.sessionCookie ? 
         client.userContext.sessionCookie.substring(0, 8) : undefined;
 
       await this.chatService.clearUserCache(data.projectId, userId);
@@ -170,7 +176,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         projectId: data.projectId,
         success: true,
         message: `Cache cleared for project ${data.projectId}${userId ? ` and user ${userId}` : ''}`,
-        hasSession: !!client.userContext
+        hasSession: client.userContext?.authType !== 'none',
+        authType: client.userContext?.authType || 'none'
       });
 
     } catch (error) {
@@ -188,7 +195,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handlePing(@ConnectedSocket() client: AuthenticatedSocket) {
     client.emit('pong', {
       timestamp: new Date().toISOString(),
-      hasSession: !!client.userContext,
+      hasSession: client.userContext?.authType !== 'none',
+      authType: client.userContext?.authType || 'none',
       sessionCookieName: client.userContext?.cookieName || 'none'
     });
   }

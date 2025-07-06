@@ -19,17 +19,19 @@ export class AuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<FastifyRequest>();
 
     try {
-      // Extract user context (session cookie) from request
+      // Extract user context (session cookie or Bearer token) from request
       const userContext = this.authService.extractUserContext(request);
       
       // Add user context to request for use in controllers/services
-      request.userContext = userContext || undefined;
+      request.userContext = userContext;
 
-      // Log session status (without sensitive data)
-      if (userContext) {
+      // Log authentication status (without sensitive data)
+      if (userContext?.authType === 'bearer') {
+        this.logger.debug('Request with Bearer token authentication');
+      } else if (userContext?.authType === 'session') {
         this.logger.debug(`Request with session cookie: ${userContext.cookieName}`);
       } else {
-        this.logger.debug('Request without session cookie');
+        this.logger.debug('Request without authentication');
       }
 
       // Always allow the request - authentication will be handled by target APIs

@@ -23,10 +23,12 @@ export class ChatController {
 
     this.logger.log(`Processing query for project ${body.projectId}: "${body.message}"`);
     
-    if (request.userContext) {
+    if (request.userContext?.authType === 'bearer') {
+      this.logger.debug('Request with Bearer token authentication');
+    } else if (request.userContext?.authType === 'session') {
       this.logger.debug(`Request with session cookie: ${request.userContext.cookieName}`);
     } else {
-      this.logger.debug('Request without session cookie - API will handle authentication');
+      this.logger.debug('Request without authentication - API will handle authentication');
     }
 
     return this.chatService.processQuery(chatRequest);
@@ -39,9 +41,11 @@ export class ChatController {
   ): Promise<ChatHistoryItem[]> {
     this.logger.log(`Searching cached responses for project ${projectId}`);
     
-    // Extract userId from session if available (optional)
-    const userId = request.userContext?.sessionCookie ? 
-      request.userContext.sessionCookie.substring(0, 8) : undefined;
+    // Extract userId from session/token if available (optional)
+    const userId = request.userContext?.authType === 'session' && request.userContext.sessionCookie ? 
+      request.userContext.sessionCookie.substring(0, 8) : 
+      request.userContext?.authType === 'bearer' && request.userContext.bearerToken ?
+      request.userContext.bearerToken.substring(0, 8) : undefined;
     
     return this.chatService.getChatHistory(projectId, userId);
   }
@@ -53,16 +57,20 @@ export class ChatController {
   ): Promise<{ sessionInfo: any; chatHistory: ChatHistoryItem[] }> {
     this.logger.log(`Getting session data for project ${projectId}`);
 
-    // Extract userId from session if available (optional)
-    const userId = request.userContext?.sessionCookie ? 
-      request.userContext.sessionCookie.substring(0, 8) : undefined;
+    // Extract userId from session/token if available (optional)
+    const userId = request.userContext?.authType === 'session' && request.userContext.sessionCookie ? 
+      request.userContext.sessionCookie.substring(0, 8) : 
+      request.userContext?.authType === 'bearer' && request.userContext.bearerToken ?
+      request.userContext.bearerToken.substring(0, 8) : undefined;
 
     const chatHistory = await this.chatService.getChatHistory(projectId, userId, 10);
     
     return {
       sessionInfo: {
-        hasSession: !!request.userContext,
+        hasSession: request.userContext?.authType !== 'none',
+        authType: request.userContext?.authType || 'none',
         sessionCookieName: request.userContext?.cookieName || 'none',
+        hasBearerToken: request.userContext?.authType === 'bearer',
         userId: userId || 'anonymous'
       },
       chatHistory
@@ -76,9 +84,11 @@ export class ChatController {
   ): Promise<{ success: boolean; message: string }> {
     this.logger.log(`Clearing cache for project ${projectId}`);
 
-    // Extract userId from session if available (optional)
-    const userId = request.userContext?.sessionCookie ? 
-      request.userContext.sessionCookie.substring(0, 8) : undefined;
+    // Extract userId from session/token if available (optional)
+    const userId = request.userContext?.authType === 'session' && request.userContext.sessionCookie ? 
+      request.userContext.sessionCookie.substring(0, 8) : 
+      request.userContext?.authType === 'bearer' && request.userContext.bearerToken ?
+      request.userContext.bearerToken.substring(0, 8) : undefined;
 
     await this.chatService.clearUserCache(projectId, userId);
     
@@ -95,9 +105,11 @@ export class ChatController {
   ): Promise<any> {
     this.logger.log(`Getting cache stats for project ${projectId}`);
 
-    // Extract userId from session if available (optional)
-    const userId = request.userContext?.sessionCookie ? 
-      request.userContext.sessionCookie.substring(0, 8) : undefined;
+    // Extract userId from session/token if available (optional)
+    const userId = request.userContext?.authType === 'session' && request.userContext.sessionCookie ? 
+      request.userContext.sessionCookie.substring(0, 8) : 
+      request.userContext?.authType === 'bearer' && request.userContext.bearerToken ?
+      request.userContext.bearerToken.substring(0, 8) : undefined;
 
     const chatHistory = await this.chatService.getChatHistory(projectId, userId);
     
@@ -106,7 +118,8 @@ export class ChatController {
       userId: userId || 'anonymous',
       totalQueries: chatHistory.length,
       lastQuery: chatHistory[0]?.timestamp || null,
-      hasSession: !!request.userContext
+      hasSession: request.userContext?.authType !== 'none',
+      authType: request.userContext?.authType || 'none'
     };
   }
 
@@ -118,10 +131,12 @@ export class ChatController {
   ): Promise<Array<{ query: string; result: ChatResponse }>> {
     this.logger.log(`Testing ${body.queries.length} queries for project ${projectId}`);
     
-    if (request.userContext) {
+    if (request.userContext?.authType === 'bearer') {
+      this.logger.debug('Test queries with Bearer token authentication');
+    } else if (request.userContext?.authType === 'session') {
       this.logger.debug(`Test queries with session cookie: ${request.userContext.cookieName}`);
     } else {
-      this.logger.debug('Test queries without session cookie');
+      this.logger.debug('Test queries without authentication');
     }
 
     return this.chatService.testQuery(projectId, body.queries);
