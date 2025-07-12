@@ -1,0 +1,18 @@
+{
+  "name": "frontend-sdk",
+  "version": "0.1.0",
+  "description": "React SDK for MCP chatbot integration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "socket.io-client": "^4.7.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2"
+  }
+}

@@ -1,0 +1,43 @@
+.mcp-chatbot {
+  border: 1px solid #ccc;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  font-family: Arial, sans-serif;
+}
+
+.mcp-chat-messages {
+  flex: 1;
+  padding: 8px;
+  overflow-y: auto;
+  background: var(--mcp-bg, #fff);
+  color: var(--mcp-text, #000);
+}
+
+.mcp-chat-input {
+  display: flex;
+  border-top: 1px solid #ccc;
+}
+
+.mcp-chat-input input {
+  flex: 1;
+  padding: 4px;
+  border: none;
+}
+
+.mcp-chat-input button {
+  padding: 4px 8px;
+}
+
+.mcp-msg {
+  margin-bottom: 4px;
+}
+
+.mcp-msg-user {
+  text-align: right;
+}
+
+.mcp-dark {
+  --mcp-bg: #333;
+  --mcp-text: #f5f5f5;
+}
