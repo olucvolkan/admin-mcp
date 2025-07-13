@@ -1,0 +1,45 @@
+{
+  "name": "mcp-chat-sdk",
+  "version": "1.0.0",
+  "description": "MCP Chat SDK - API-Aware Chat Assistant for Admin Panels",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "lint": "eslint src --ext .ts,.tsx",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "chat",
+    "sdk",
+    "api",
+    "admin",
+    "websocket",
+    "openapi"
+  ],
+  "author": "MCP Team",
+  "license": "MIT",
+  "dependencies": {
+    "socket.io-client": "^4.7.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^6.18.1",
+    "@typescript-eslint/parser": "^6.18.1",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "typescript": "^5.3.3"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/olucvolkan/admin-mcp.git",
+    "directory": "frontend"
+  }
+}
